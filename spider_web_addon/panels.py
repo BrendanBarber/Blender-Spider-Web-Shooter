@@ -80,33 +80,11 @@ class VIEW3D_PT_spider_web_panel(bpy.types.Panel):
         
         col = layout.column(align=True)
         col.operator("mesh.create_spider_web_coords", text="Create from Coordinates", icon='MESH_GRID')
+        col.operator("mesh.update_spider_web_position", text="Update Selected Position", icon="EMPTY_ARROWS")
+        col.operator("mesh.update_spider_web", text="Update Selected Properties", icon='LIGHT_POINT')
         
         layout.separator()
         layout.operator("spider_web.load_config", text="Reset to Defaults")
-
-class MESH_OT_set_origin_from_cursor(bpy.types.Operator):
-    bl_idname = "mesh.set_origin_cursor"
-    bl_label = "Set Origin from Cursor"
-    bl_description = "Set origin coordinates from 3D cursor position"
-    bl_options = {'REGISTER', 'UNDO'}
-    
-    def execute(self, context):
-        cursor_loc = context.scene.cursor.location
-        context.scene.spider_web_props.set_origin(cursor_loc)
-        self.report({'INFO'}, f"Origin set to {cursor_loc}")
-        return {'FINISHED'}
-
-class MESH_OT_set_target_from_cursor(bpy.types.Operator):
-    bl_idname = "mesh.set_target_cursor"
-    bl_label = "Set Target from Cursor"
-    bl_description = "Set target coordinates from 3D cursor position"
-    bl_options = {'REGISTER', 'UNDO'}
-    
-    def execute(self, context):
-        cursor_loc = context.scene.cursor.location
-        context.scene.spider_web_props.set_target(cursor_loc)
-        self.report({'INFO'}, f"Target set to {cursor_loc}")
-        return {'FINISHED'}
 
 class SPIDER_WEB_OT_load_config(bpy.types.Operator):
     bl_idname = "spider_web.load_config"

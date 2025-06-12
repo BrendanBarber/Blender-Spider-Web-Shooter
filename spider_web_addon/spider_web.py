@@ -25,6 +25,11 @@ class SpiderWeb:
     def create_web(self):
         # Create origin reference point
         origin_empty = create_control_point(self.origin, "WebOrigin")
+        
+        # Store both shot and spread configurations on the origin empty
+        self.spider_shot.store_config_on_empty(origin_empty)
+        self.spider_spread.store_config_on_empty(origin_empty)
+        
         # Create target reference point
         target_empty = create_control_point(self.target, "WebTarget", origin_empty)
 
