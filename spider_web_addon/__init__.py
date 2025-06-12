@@ -18,17 +18,25 @@ from . import operators
 from . import panels
 from . import properties
 
-classes = []
+classes = [
+    properties.SpiderShotProperties,
+    properties.SpiderSpreadProperties, 
+    properties.SpiderWebProperties,
+    operators.MESH_OT_create_spider_web_from_coords,
+    panels.VIEW3D_PT_spider_web_panel,
+    panels.SPIDER_WEB_OT_load_config,
+    panels.SPIDER_WEB_OT_save_config,
+]
 
 def register():
     for cls in classes:
         bpy.utils.register_class(cls)
-
-    # Add properties to scene
+    
+    bpy.types.Scene.spider_web_props = PointerProperty(type=properties.SpiderWebProperties)
 
 def unregister():
-    # Delete properties from scene
-
+    del bpy.types.Scene.spider_web_props
+    
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
 

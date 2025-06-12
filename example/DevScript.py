@@ -8,7 +8,7 @@ def create_control_point(location, name, parent=None):
     bpy.ops.object.empty_add(type='SPHERE', location=location)
     empty = bpy.context.active_object
     empty.name = name
-    empty.empty_display_size = 0.2
+    empty.empty_display_size = 0.05
     
     if parent is not None:
         empty.parent = parent
@@ -83,42 +83,18 @@ class SpiderSpread:
         self.target = target
         self.config = config or SpiderSpreadConfig()
 
-@dataclass
-class SpiderWebConfig:
-    spider_shot_config: SpiderShotConfig = field(default_factory=SpiderShotConfig)
-    spider_spread_config: SpiderSpreadConfig = field(default_factory=SpiderSpreadConfig)
-
-class SpiderWeb:
-    """A generated spider web and shot animated"""
-    def __init__(self, origin: Tuple[float, float, float], target: Tuple[float, float, float], config: SpiderWebConfig = SpiderWebConfig()):
-        self.origin = origin
-        self.target = target
-        self.config = config or SpiderWebConfig()
-        
-        # Shot and Spread data and behaviors 
-        self.spider_shot = SpiderShot(origin, target, config.spider_shot_config)
-        self.spider_spread = SpiderSpread(origin, target, config.spider_spread_config)
-        
-        # Blender Object
-        self.web_object = None
-            
-    def create_web_points(self):
+    def create_spread(self, origin_empty, target_empty):
         """Creates the control points for the web spread"""
-        # Create origin reference point
-        origin_empty = create_control_point(self.origin, "WebOrigin")
-        # Create target reference point
-        target_empty = create_control_point(self.target, "WebTarget", origin_empty)
-        
         # Calculate actual web center offset
-        web_center_vec = get_point_offset_from_end(self.origin, self.target, self.config.spider_spread_config.height)
+        web_center_vec = get_point_offset_from_end(self.origin, self.target, self.config.height)
         
         # Create web center point
         center_empty = create_control_point(web_center_vec, "WebCenter", target_empty)
         
         # Radially create the points
-        radius = self.config.spider_spread_config.radius
-        density_spoke = self.config.spider_spread_config.density_spoke
-        density_rib = self.config.spider_spread_config.density_rib
+        radius = self.config.radius
+        density_spoke = self.config.density_spoke
+        density_rib = self.config.density_rib
         
         # Get the direction of the web
         web_direction = (Vector(self.target) - Vector(self.origin)).normalized()
@@ -160,5 +136,34 @@ class SpiderWeb:
                 
                 create_control_point(rib_position, f"WebRib_{i}-{j}", spoke_empty)
 
-web = SpiderWeb((0, 0, 0), (5, 0, 0))
-web.create_web_points()
+@dataclass
+class SpiderWebConfig:
+    spider_shot_config: SpiderShotConfig = field(default_factory=SpiderShotConfig)
+    spider_spread_config: SpiderSpreadConfig = field(default_factory=SpiderSpreadConfig)
+
+class SpiderWeb:
+    """A generated spider web and shot animated"""
+    def __init__(self, origin: Tuple[float, float, float], target: Tuple[float, float, float], config: SpiderWebConfig = None):
+        self.origin = origin
+        self.target = target
+        self.config = config or SpiderWebConfig()
+        
+        # Shot and Spread data and behaviors 
+        self.spider_shot = SpiderShot(origin, target, config.spider_shot_config if config else None)
+        self.spider_spread = SpiderSpread(origin, target, config.spider_spread_config if config else None)
+        
+        # Blender Object
+        self.web_object = None
+
+    def create_web(self):  # Added 'self' parameter
+        # Create origin reference point
+        origin_empty = create_control_point(self.origin, "WebOrigin")
+        # Create target reference point
+        target_empty = create_control_point(self.target, "WebTarget", origin_empty)
+
+        # Create spread points
+        self.spider_spread.create_spread(origin_empty, target_empty)  # Added 'self.'
+
+# Usage
+web = SpiderWeb((0, 0, 0), (5, 3, 5))
+web.create_web()
