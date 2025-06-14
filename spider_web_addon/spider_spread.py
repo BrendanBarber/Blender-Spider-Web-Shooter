@@ -1,10 +1,11 @@
 import bpy
 import math
 from dataclasses import dataclass, field
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict, List
 from mathutils import Vector, Matrix
 from .utils import *
 from .config import *
+from .node_graphs import *
 
 class SpiderSpread:    
     """The the web spread at the target"""
@@ -13,16 +14,24 @@ class SpiderSpread:
         self.target = target
         self.config = config or SpiderSpreadConfig()
 
+        # Control Empties
+        self.web_center = None
+        self.web_spokes_ribs: Dict[bpy.types.Object, List[bpy.types.Object]] = {}
+
+        # Mesh Objs
+        self.mesh_objs = []
+
     def create_spread(self, origin_empty, target_empty):
         """Creates the control points for the web spread"""
         # Calculate actual web center offset
         web_center_vec = get_point_offset_from_end(self.origin, self.target, self.config.height)
         
         # Create web center point
-        center_empty = create_control_point(web_center_vec, "WebCenter", target_empty)
+        self.web_center = create_control_point(web_center_vec, "WebCenter", target_empty)
         
         # Radially create the points
         radius = self.config.radius
+        height = self.config.height
         density_spoke = self.config.density_spoke
         density_rib = self.config.density_rib
         
@@ -39,33 +48,78 @@ class SpiderSpread:
         for i in range(density_spoke):
             # Create spoke point
             angle = spoke_step * i
-            
+
             offset = Vector((
                 radius * math.cos(angle),
                 radius * math.sin(angle),
-                0
+                height
             ))
-            
+
             world_offset = rotation_matrix @ offset
             spoke_position = web_center_vec + world_offset
-            
-            spoke_empty = create_control_point(spoke_position, f"WebSpoke_{i}", center_empty)
-            
-            # Create rib points along spoke
-            for j in range(1, density_rib+1):
+
+            spoke_empty = create_control_point(spoke_position, f"WebSpoke_{i}", self.web_center)
+
+            rib_empties = []
+            for j in range(1, density_rib + 1):
                 step = rib_step * j
-                
+
                 offset = Vector((
                     step * math.cos(angle),
                     step * math.sin(angle),
-                    0
+                    (step * height) / radius
                 ))
-                
+
                 world_offset = rotation_matrix @ offset
                 rib_position = web_center_vec + world_offset
-                
-                create_control_point(rib_position, f"WebRib_{i}-{j}", spoke_empty)
+
+                rib_empty = create_control_point(rib_position, f"WebRib_{i}-{j}", spoke_empty)
+                rib_empties.append(rib_empty)
+
+            # Store spoke -> ribs mapping
+            self.web_spokes_ribs[spoke_empty] = rib_empties
     
+    def create_mesh(self, context, origin_empty, target_empty):
+        # TODO: Update this to reuse if it already exists
+        web_curve_node_tree = create_web_curve_node_tree()
+        
+        # Loop through to create all curves
+        for i, spoke in enumerate(self.web_spokes_ribs):
+            # Create object
+            mesh = bpy.data.meshes.new("WebCurve")
+            obj = bpy.data.objects.new("WebCurve", mesh)
+            context.collection.objects.link(obj)
+            self.mesh_objs.append(obj)
+
+            # Parent
+            obj.parent = origin_empty
+            obj.parent_type = 'OBJECT'
+
+            # Add geometry node modifier
+            modifier = obj.modifiers.new("GeometryNodes", 'NODES')
+            modifier.node_group = web_curve_node_tree
+
+            # Add this right after creating the modifier and setting the node_group
+            print(f"Available modifier properties for {obj.name}:")
+            for key in modifier.keys():
+                print(f"  {key}")
+
+            # Set the inputs for the modifier
+            modifier["Socket_0"] = self.web_center
+            modifier["Socket_1"] = spoke
+            modifier["Socket_2"] = origin_empty
+            modifier["Socket_3"] = self.config.web_thickness
+            modifier["Socket_4"] = 50 # Temp
+            modifier["Socket_5"] = self.config.curvature
+
+            for key, value in modifier.items():
+                print(f"  {key} -> {value}")
+
+            obj.select_set(True)
+
+        if self.mesh_objs:
+            bpy.context.view_layer.objects.active = self.mesh_objs[-1]
+
     def store_config_on_empty(self, empty):
         """Store the spread configuration as custom properties on the empty"""
         # Use Blender's proper custom property system with UI metadata
@@ -153,3 +207,4 @@ class SpiderSpread:
             config.random_spread_interior = empty["spider_spread_random_spread_interior"]
         
         return config
+

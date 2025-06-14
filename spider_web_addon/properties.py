@@ -12,6 +12,12 @@ class SpiderShotProperties(PropertyGroup):
         default=SpiderShotConfig().shoot_time,
         min=1,
     )
+
+    is_target_parent: BoolProperty(
+        name="Target Is Parent",
+        description="Whether the parent node of the web is the target or the origin",
+        default=SpiderShotConfig().is_target_parent
+    )
     
     is_tethered: BoolProperty(
         name="Is Tethered",
@@ -86,13 +92,20 @@ class SpiderSpreadProperties(PropertyGroup):
         min=1,
         max=32
     )
+
+    web_thickness: FloatProperty(
+        name="Web Thickness",
+        description="Thickness of web strands",
+        default=SpiderSpreadConfig().web_thickness,
+        min=0.01,
+    )
     
     curvature: FloatProperty(
         name="Curvature",
         description="Curvature of web strands",
         default=SpiderSpreadConfig().curvature,
         min=0.0,
-        max=2.0
+        max=4.0
     )
     
     random_spread_edge: FloatProperty(
@@ -179,6 +192,7 @@ class SpiderWebProperties(PropertyGroup):
         """Convert Blender properties back to config dataclass"""
         shot_config = SpiderShotConfig(
             shoot_time=self.shot_props.shoot_time,
+            is_target_parent=self.shot_props.is_target_parent,
             is_tethered=self.shot_props.is_tethered,
             tether_width=self.shot_props.tether_width if self.shot_props.is_tethered else None,
             tether_slack=self.shot_props.tether_slack if self.shot_props.is_tethered else None,
@@ -192,6 +206,7 @@ class SpiderWebProperties(PropertyGroup):
             spread_time=self.spread_props.spread_time,
             density_spoke=self.spread_props.density_spoke,
             density_rib=self.spread_props.density_rib,
+            web_thickness=self.spread_props.web_thickness,
             curvature=self.spread_props.curvature,
             random_spread_edge=self.spread_props.random_spread_edge,
             random_spread_interior=self.spread_props.random_spread_interior,
@@ -206,6 +221,7 @@ class SpiderWebProperties(PropertyGroup):
         """Load config dataclass into Blender properties"""
         # Shot properties
         self.shot_props.shoot_time = config.spider_shot_config.shoot_time
+        self.shot_props.is_target_parent = config.spider_shot_config.is_target_parent
         self.shot_props.is_tethered = config.spider_shot_config.is_tethered
         
         if config.spider_shot_config.tether_width is not None:
@@ -223,6 +239,7 @@ class SpiderWebProperties(PropertyGroup):
         self.spread_props.spread_time = config.spider_spread_config.spread_time
         self.spread_props.density_spoke = config.spider_spread_config.density_spoke
         self.spread_props.density_rib = config.spider_spread_config.density_rib
+        self.spread_props.web_thickness = config.spider_spread_config.web_thickness
         self.spread_props.curvature = config.spider_spread_config.curvature
         self.spread_props.random_spread_edge = config.spider_spread_config.random_spread_edge
         self.spread_props.random_spread_interior = config.spider_spread_config.random_spread_interior

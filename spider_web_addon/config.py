@@ -5,6 +5,7 @@ from typing import Tuple, Optional
 @dataclass
 class SpiderShotConfig:
     shoot_time: float = 1.0
+    is_target_parent: float = False
     is_tethered: bool = True
     
     # Tether specific properties
@@ -35,6 +36,7 @@ class SpiderSpreadConfig:
     spread_time: float = 1.0
     density_spoke: int = 5
     density_rib: int = 3
+    web_thickness: float = 0.01
     curvature: float = 0.1
     random_spread_edge: float = 0.1
     random_spread_interior: float = 0.05

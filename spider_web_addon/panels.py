@@ -27,7 +27,6 @@ class VIEW3D_PT_spider_web_panel(bpy.types.Panel):
         # Helper buttons for origin
         row = col.row(align=True)
         row.operator("mesh.set_origin_cursor", text="From Cursor", icon='CURSOR')
-        row.operator("mesh.set_origin_selected", text="From Selected", icon='RESTRICT_SELECT_OFF')
         
         col.separator()
         
@@ -41,7 +40,12 @@ class VIEW3D_PT_spider_web_panel(bpy.types.Panel):
         # Helper buttons for target
         row = col.row(align=True)
         row.operator("mesh.set_target_cursor", text="From Cursor", icon='CURSOR')
-        row.operator("mesh.set_target_selected", text="From Selected", icon='RESTRICT_SELECT_OFF')
+
+        col.separator()
+
+        # Parent section
+        row = col.row(align=True)
+        row.prop(props.shot_props, "is_target_parent")
         
         # Shot Properties Section
         box = layout.box()
@@ -67,6 +71,7 @@ class VIEW3D_PT_spider_web_panel(bpy.types.Panel):
         row.prop(props.spread_props, "density_spoke")
         row.prop(props.spread_props, "density_rib")
         
+        box.prop(props.spread_props, "web_thickness")
         box.prop(props.spread_props, "curvature")
         
         col = box.column()

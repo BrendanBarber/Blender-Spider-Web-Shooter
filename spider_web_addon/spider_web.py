@@ -22,16 +22,22 @@ class SpiderWeb:
         # Blender Object
         self.web_object = None
 
-    def create_web(self):
-        # Create origin reference point
-        origin_empty = create_control_point(self.origin, "WebOrigin")
+    def create_web(self, context):
+        # Create main SpiderWeb empty at origin location
+        spider_web_empty = create_control_point(self.origin, "SpiderWeb")
+        spider_web_empty.empty_display_type = 'PLAIN_AXES'
+        spider_web_empty.hide_select = True
         
-        # Store both shot and spread configurations on the origin empty
-        self.spider_shot.store_config_on_empty(origin_empty)
-        self.spider_spread.store_config_on_empty(origin_empty)
+        # Store both shot and spread configurations on the spider web empty
+        self.spider_shot.store_config_on_empty(spider_web_empty)
+        self.spider_spread.store_config_on_empty(spider_web_empty)
         
-        # Create target reference point
-        target_empty = create_control_point(self.target, "WebTarget", origin_empty)
+        # Create origin reference point as child of SpiderWeb
+        origin_empty = create_control_point(self.origin, "WebOrigin", spider_web_empty)
+        
+        # Create target reference point as child of SpiderWeb
+        target_empty = create_control_point(self.target, "WebTarget", spider_web_empty)
 
         # Create spread points
         self.spider_spread.create_spread(origin_empty, target_empty)
+        self.spider_spread.create_mesh(context, origin_empty, target_empty)
