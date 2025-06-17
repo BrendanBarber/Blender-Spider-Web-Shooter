@@ -26,7 +26,7 @@ def create_web_curve_node_tree(name="WebCurveNodeTree"):
     # Set default values
     profile_radius_input.default_value = 0.01
     curve_resolution_input.default_value = 30
-    curve_amount_input = 0.1
+    curve_amount_input.default_value = 0.1
     
     # Output socket
     geometry_output = node_tree.interface.new_socket(name="Geometry", socket_type='NodeSocketGeometry', in_out='OUTPUT')
@@ -35,14 +35,17 @@ def create_web_curve_node_tree(name="WebCurveNodeTree"):
     obj_info_center = node_tree.nodes.new('GeometryNodeObjectInfo')
     obj_info_center.name = "Object Info Center"
     obj_info_center.location = (-600, 200)
+    obj_info_center.transform_space = 'RELATIVE'
     
     obj_info_spoke = node_tree.nodes.new('GeometryNodeObjectInfo')
     obj_info_spoke.name = "Object Info Spoke"
     obj_info_spoke.location = (-600, 0)
+    obj_info_spoke.transform_space = 'RELATIVE'
     
     obj_info_origin = node_tree.nodes.new('GeometryNodeObjectInfo')
     obj_info_origin.name = "Object Info Origin"
     obj_info_origin.location = (-600, -200)
+    obj_info_origin.transform_space = 'RELATIVE'
     
     # Create Curve Line node
     curve_line = node_tree.nodes.new('GeometryNodeCurvePrimitiveLine')
@@ -54,7 +57,7 @@ def create_web_curve_node_tree(name="WebCurveNodeTree"):
     resample_curve = node_tree.nodes.new('GeometryNodeResampleCurve')
     resample_curve.location = (-200, 100)
     resample_curve.mode = 'COUNT'
-    
+
     # Create Spline Parameter node
     spline_param = node_tree.nodes.new('GeometryNodeSplineParameter')
     spline_param.location = (-200, -100)
@@ -81,39 +84,43 @@ def create_web_curve_node_tree(name="WebCurveNodeTree"):
     math_008.name = "Math.008"
     math_008.location = (0, -350)
     math_008.operation = 'MULTIPLY'
-    math_008.inputs[1].default_value = 0.1
     
     # Create Vector Math nodes
-    vec_math = node_tree.nodes.new('ShaderNodeVectorMath')
-    vec_math.name = "Vector Math"
-    vec_math.location = (-400, -200)
-    vec_math.operation = 'ADD'
+    # Calculate midpoint between start and end
+    vec_math_midpoint = node_tree.nodes.new('ShaderNodeVectorMath')
+    vec_math_midpoint.name = "Vector Math Midpoint"
+    vec_math_midpoint.location = (-400, -200)
+    vec_math_midpoint.operation = 'ADD'
     
-    vec_math_001 = node_tree.nodes.new('ShaderNodeVectorMath')
-    vec_math_001.name = "Vector Math.001"
-    vec_math_001.location = (-200, -200)
-    vec_math_001.operation = 'SCALE'
-    vec_math_001.inputs[3].default_value = 0.5
+    vec_math_midpoint_scale = node_tree.nodes.new('ShaderNodeVectorMath')
+    vec_math_midpoint_scale.name = "Vector Math Midpoint Scale"
+    vec_math_midpoint_scale.location = (-200, -200)
+    vec_math_midpoint_scale.operation = 'SCALE'
+    vec_math_midpoint_scale.inputs[3].default_value = -0.5
     
-    vec_math_002 = node_tree.nodes.new('ShaderNodeVectorMath')
-    vec_math_002.name = "Vector Math.002"
-    vec_math_002.location = (-200, -300)
-    vec_math_002.operation = 'ADD'
+    # Calculate direction from midpoint to reference point (WebOrigin)
+    vec_math_direction = node_tree.nodes.new('ShaderNodeVectorMath')
+    vec_math_direction.name = "Vector Math Direction"
+    vec_math_direction.location = (-200, -300)
+    vec_math_direction.operation = 'SUBTRACT'
     
-    vec_math_003 = node_tree.nodes.new('ShaderNodeVectorMath')
-    vec_math_003.name = "Vector Math.003"
-    vec_math_003.location = (-200, -400)
-    vec_math_003.operation = 'NORMALIZE'
+    # Normalize the direction
+    vec_math_normalize = node_tree.nodes.new('ShaderNodeVectorMath')
+    vec_math_normalize.name = "Vector Math Normalize"
+    vec_math_normalize.location = (-200, -400)
+    vec_math_normalize.operation = 'NORMALIZE'
     
-    vec_math_007 = node_tree.nodes.new('ShaderNodeVectorMath')
-    vec_math_007.name = "Vector Math.007"
-    vec_math_007.location = (200, -300)
-    vec_math_007.operation = 'SCALE'
+    # Scale by curve amount
+    vec_math_scale_curve = node_tree.nodes.new('ShaderNodeVectorMath')
+    vec_math_scale_curve.name = "Vector Math Scale Curve"
+    vec_math_scale_curve.location = (200, -300)
+    vec_math_scale_curve.operation = 'SCALE'
 
-    vec_math_008 = node_tree.nodes.new('ShaderNodeVectorMath')
-    vec_math_008.name = "Vector Math.008"
-    vec_math_008.location = (200, -400)
-    vec_math_008.operation = 'SUBTRACT'
+    # Final offset calculation
+    vec_math_final_offset = node_tree.nodes.new('ShaderNodeVectorMath')
+    vec_math_final_offset.name = "Vector Math Final Offset"
+    vec_math_final_offset.location = (200, -400)
+    vec_math_final_offset.operation = 'SCALE'
     
     # Create Set Position node
     set_position = node_tree.nodes.new('GeometryNodeSetPosition')
@@ -150,31 +157,36 @@ def create_web_curve_node_tree(name="WebCurveNodeTree"):
     # Link profile curve
     node_tree.links.new(curve_circle.outputs['Curve'], curve_to_mesh.inputs['Profile Curve'])
     
-    # Link complex math for curve deformation
+    # Link math for curve deformation (parabolic curve)
     node_tree.links.new(spline_param.outputs['Factor'], math_005.inputs[0])
-    node_tree.links.new(spline_param.outputs['Factor'], math_005.inputs[0])  # Duplicate connection
     node_tree.links.new(math_005.outputs['Value'], math_006.inputs[0])
     node_tree.links.new(spline_param.outputs['Factor'], math_006.inputs[1])
     node_tree.links.new(math_006.outputs['Value'], math_007.inputs[0])
     node_tree.links.new(math_007.outputs['Value'], math_008.inputs[0])
     
-    # Link vector math chain for position calculation
-    node_tree.links.new(obj_info_center.outputs['Location'], vec_math.inputs[0])
-    node_tree.links.new(obj_info_spoke.outputs['Location'], vec_math.inputs[1])
-    node_tree.links.new(vec_math.outputs['Vector'], vec_math_001.inputs[0])
-    node_tree.links.new(obj_info_origin.outputs['Location'], vec_math_002.inputs[0])
-    node_tree.links.new(vec_math_001.outputs['Vector'], vec_math_002.inputs[1])
-    node_tree.links.new(vec_math_002.outputs['Vector'], vec_math_003.inputs[0])
-    node_tree.links.new(vec_math_003.outputs['Vector'], vec_math_007.inputs[0])
-    node_tree.links.new(math_008.outputs['Value'], vec_math_007.inputs[3])
-    node_tree.links.new(vec_math_007.outputs['Vector'], vec_math_008.inputs[0])
-    node_tree.links.new(obj_info_origin.outputs['Location'], vec_math_008.inputs[1])
-
-    # Link curvature input to curve amount
-    node_tree.links.new(input_node.outputs['Curve Amount'], math_008.inputs[1])
+    # Link vector math chain for proper curve direction calculation
+    # Calculate midpoint between start and end points
+    node_tree.links.new(obj_info_center.outputs['Location'], vec_math_midpoint.inputs[0])
+    node_tree.links.new(obj_info_spoke.outputs['Location'], vec_math_midpoint.inputs[1])
+    node_tree.links.new(vec_math_midpoint.outputs['Vector'], vec_math_midpoint_scale.inputs[0])
+    
+    # Calculate direction from midpoint to reference point
+    node_tree.links.new(obj_info_origin.outputs['Location'], vec_math_direction.inputs[0])
+    node_tree.links.new(vec_math_midpoint_scale.outputs['Vector'], vec_math_direction.inputs[1])
+    
+    # Normalize the direction
+    node_tree.links.new(vec_math_direction.outputs['Vector'], vec_math_normalize.inputs[0])
+    
+    # Scale by curve formula and curve amount
+    node_tree.links.new(vec_math_normalize.outputs['Vector'], vec_math_scale_curve.inputs[0])
+    node_tree.links.new(math_008.outputs['Value'], vec_math_scale_curve.inputs[3])
+    
+    # Final scaling by curve amount input
+    node_tree.links.new(vec_math_scale_curve.outputs['Vector'], vec_math_final_offset.inputs[0])
+    node_tree.links.new(input_node.outputs['Curve Amount'], vec_math_final_offset.inputs[3])
     
     # Link final offset to set position
-    node_tree.links.new(vec_math_008.outputs['Vector'], set_position.inputs['Offset'])
+    node_tree.links.new(vec_math_final_offset.outputs['Vector'], set_position.inputs['Offset'])
     
     # Link final output
     node_tree.links.new(curve_to_mesh.outputs['Mesh'], output_node.inputs['Geometry'])

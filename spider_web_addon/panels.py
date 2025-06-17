@@ -42,10 +42,6 @@ class VIEW3D_PT_spider_web_panel(bpy.types.Panel):
         row.operator("mesh.set_target_cursor", text="From Cursor", icon='CURSOR')
 
         col.separator()
-
-        # Parent section
-        row = col.row(align=True)
-        row.prop(props.shot_props, "is_target_parent")
         
         # Shot Properties Section
         box = layout.box()
