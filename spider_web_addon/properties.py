@@ -8,9 +8,10 @@ from .config import SpiderWebConfig, SpiderShotConfig, SpiderSpreadConfig
 class SpiderShotProperties(PropertyGroup):
     shoot_time: FloatProperty(
         name="Shoot Time",
-        description="Time for web to shoot out and reach target (in frames)",
+        description="Time for web to shoot out and reach target (in seconds)",
         default=SpiderShotConfig().shoot_time,
-        min=1,
+        min=0.1,
+        max=10.0
     )
 
     is_target_parent: BoolProperty(
@@ -72,9 +73,10 @@ class SpiderSpreadProperties(PropertyGroup):
     
     spread_time: FloatProperty(
         name="Spread Time",
-        description="Time for web to spread out (in frames)",
+        description="Time for web to spread out (in seconds)",
         default=SpiderSpreadConfig().spread_time,
-        min=0.0,
+        min=0.1,
+        max=10.0
     )
     
     density_spoke: IntProperty(
@@ -128,6 +130,27 @@ class SpiderWebProperties(PropertyGroup):
     shot_props: bpy.props.PointerProperty(type=SpiderShotProperties)
     spread_props: bpy.props.PointerProperty(type=SpiderSpreadProperties)
     
+    # Animation settings
+    animate_web: BoolProperty(
+        name="Animate Web",
+        description="Create keyframes for web animation",
+        default=True
+    )
+    
+    start_frame: IntProperty(
+        name="Start Frame",
+        description="Frame to start the web animation",
+        default=1,
+        min=1
+    )
+    
+    progressive_spread: BoolProperty(
+        name="Progressive Spread",
+        description="Animate web spreading progressively from center to edge (more organic)",
+        default=True
+    )
+    
+    # Coordinate properties
     origin_x: FloatProperty(
         name="Origin X",
         description="X coordinate of web origin",

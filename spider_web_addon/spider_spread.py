@@ -161,6 +161,8 @@ class SpiderSpread:
             # Store spoke -> ribs mapping
             self.web_spokes_ribs[spoke_empty] = rib_empties
     
+    
+
     def create_rib_meshes(self, context, origin_empty, target_empty):
         """Create the rib curves that connect between spokes"""
         web_curve_node_tree = create_web_curve_node_tree()

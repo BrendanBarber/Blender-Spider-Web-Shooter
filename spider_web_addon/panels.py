@@ -12,6 +12,18 @@ class VIEW3D_PT_spider_web_panel(bpy.types.Panel):
         layout = self.layout
         props = context.scene.spider_web_props
         
+        # Animation Settings Section
+        box = layout.box()
+        box.label(text="Animation Settings", icon='PLAY')
+        
+        col = box.column()
+        col.prop(props, "animate_web")
+        
+        if props.animate_web:
+            row = col.row()
+            row.prop(props, "start_frame")
+            col.prop(props, "progressive_spread")
+        
         # Coordinates Section
         box = layout.box()
         box.label(text="Web Coordinates", icon='EMPTY_ARROWS')
@@ -83,6 +95,13 @@ class VIEW3D_PT_spider_web_panel(bpy.types.Panel):
         col.operator("mesh.create_spider_web_coords", text="Create from Coordinates", icon='MESH_GRID')
         col.operator("mesh.update_spider_web_position", text="Update Selected Position", icon="EMPTY_ARROWS")
         col.operator("mesh.update_spider_web", text="Update Selected Properties", icon='LIGHT_POINT')
+        
+        # Animation controls
+        if props.animate_web:
+            layout.separator()
+            col = layout.column(align=True)
+            col.operator("mesh.animate_selected_web", text="Animate Selected Web", icon='PLAY')
+            col.operator("mesh.clear_web_animation", text="Clear Animation", icon='X')
         
         layout.separator()
         layout.operator("spider_web.load_config", text="Reset to Defaults")
