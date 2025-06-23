@@ -144,12 +144,6 @@ class SpiderWebProperties(PropertyGroup):
         min=1
     )
     
-    progressive_spread: BoolProperty(
-        name="Progressive Spread",
-        description="Animate web spreading progressively from center to edge (more organic)",
-        default=True
-    )
-    
     # Coordinate properties
     origin_x: FloatProperty(
         name="Origin X",
@@ -237,7 +231,9 @@ class SpiderWebProperties(PropertyGroup):
         
         return SpiderWebConfig(
             spider_shot_config=shot_config,
-            spider_spread_config=spread_config
+            spider_spread_config=spread_config,
+            animate_web=self.animate_web,
+            start_frame=self.start_frame
         )
     
     def from_config(self, config: SpiderWebConfig):

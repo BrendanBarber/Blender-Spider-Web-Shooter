@@ -45,3 +45,5 @@ class SpiderSpreadConfig:
 class SpiderWebConfig:
     spider_shot_config: SpiderShotConfig = field(default_factory=SpiderShotConfig)
     spider_spread_config: SpiderSpreadConfig = field(default_factory=SpiderSpreadConfig)
+    animate_web: bool = True
+    start_frame: int = 1

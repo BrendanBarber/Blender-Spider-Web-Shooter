@@ -248,6 +248,95 @@ class SpiderSpread:
         if self.mesh_objs:
             bpy.context.view_layer.objects.active = self.mesh_objs[-1]
 
+    def animate_spread(self, context, origin_empty, target_empty, starting_frame=1, frame_length_seconds=1):
+        """Enhanced animation that includes expanding sphere boolean and rib movement"""
+        
+        # Calculate animation parameters
+        fps = context.scene.render.fps / context.scene.render.fps_base
+        frame_length_frames = int(frame_length_seconds * fps)
+        end_frame = starting_frame + frame_length_frames
+        
+        # 1. Animate web center moving up
+        start_position = self.target
+        end_position = get_point_offset_from_end(self.origin, self.target, self.config.height)
+
+        context.scene.frame_set(starting_frame)
+        self.web_center.location = start_position
+        self.web_center.keyframe_insert(data_path="location", frame=starting_frame)
+
+        context.scene.frame_set(end_frame)
+        self.web_center.location = end_position
+        self.web_center.keyframe_insert(data_path="location", frame=end_frame)
+
+        # 2. Create hidden expanding sphere for boolean operations
+        sphere_radius_max = self.config.radius * 1.5  # Make sure it's big enough to cover the whole web
+        
+        # Create sphere mesh
+        bpy.ops.mesh.primitive_uv_sphere_add(location=(0,0,0))
+        sphere_obj = context.active_object
+        sphere_obj.name = "WebSpreadSphere"
+        sphere_obj.parent = self.web_center
+        sphere_obj.parent_type = 'OBJECT'
+        
+        # Make sphere invisible (hide in viewport and render)
+        sphere_obj.hide_viewport = True
+        sphere_obj.hide_render = True
+        
+        # Animate sphere scale from very small to full size
+        context.scene.frame_set(starting_frame)
+        sphere_obj.scale = (0.001, 0.001, 0.001)  # Very small at start
+        sphere_obj.keyframe_insert(data_path="scale", frame=starting_frame)
+        
+        context.scene.frame_set(end_frame)
+        sphere_obj.scale = (sphere_radius_max, sphere_radius_max, sphere_radius_max)
+        sphere_obj.keyframe_insert(data_path="scale", frame=end_frame)
+        
+        # 3. Add boolean intersect modifiers to all spoke meshes
+        spoke_meshes = [obj for obj in self.mesh_objs if "WebSpoke_" in obj.name and "WebRib_" not in obj.name]
+        
+        for spoke_mesh in spoke_meshes:
+            # Add boolean modifier
+            bool_modifier = spoke_mesh.modifiers.new("WebSpreadBoolean", 'BOOLEAN')
+            bool_modifier.operation = 'INTERSECT'
+            bool_modifier.object = sphere_obj
+            bool_modifier.solver = 'EXACT'  # Use exact solver for better results
+        
+        # 4. Animate ribs moving from center to their final positions
+        for spoke_empty, rib_empties in self.web_spokes_ribs.items():
+            for rib_empty in rib_empties:
+                # Store the final position
+                final_position = rib_empty.location.copy()
+                
+                # Calculate starting position (very close to web center)
+                web_center_pos = Vector(end_position)
+                direction_to_final = (Vector(final_position) - web_center_pos).normalized()
+                start_position_rib = web_center_pos + (direction_to_final * 0.01)  # Very close to center
+                
+                # Set starting keyframe
+                context.scene.frame_set(starting_frame)
+                rib_empty.location = start_position_rib
+                rib_empty.keyframe_insert(data_path="location", frame=starting_frame)
+                
+                # Set ending keyframe
+                context.scene.frame_set(end_frame)
+                rib_empty.location = final_position
+                rib_empty.keyframe_insert(data_path="location", frame=end_frame)
+        
+        # 5. Optional: Add easing to keyframes for more natural animation
+        # Get all keyframes and set interpolation to ease-out
+        if context.scene.animation_data:
+            for fcurve in context.scene.animation_data.action.fcurves:
+                for keyframe in fcurve.keyframe_points:
+                    keyframe.interpolation = 'BEZIER'
+                    keyframe.handle_left_type = 'AUTO'
+                    keyframe.handle_right_type = 'AUTO'
+        
+        # Store reference to sphere for cleanup if needed
+        self.spread_sphere = sphere_obj
+        
+        # Set frame back to start
+        context.scene.frame_set(starting_frame)
+
     def store_config_on_empty(self, empty):
         """Store the spread configuration as custom properties on the empty"""
         # Use Blender's proper custom property system with UI metadata
