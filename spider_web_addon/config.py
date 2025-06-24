@@ -9,25 +9,25 @@ class SpiderShotConfig:
     is_tethered: bool = True
     
     # Tether specific properties
-    tether_width: Optional[float] = 0.1
+    tether_width: Optional[float] = 0.02
     tether_slack: Optional[float] = 0.05
     
     # Projectile specific properties (can still be used optionally with tether)
-    projectile_size: Optional[float] = 0.5
-    projectile_trail_length: Optional[float] = 1.0
+    projectile_size: Optional[float] = 0.1
+    projectile_trail_length: Optional[float] = 0.5
     
     def __post_init__(self):
         """Set optional properties based on shot type"""
         if self.is_tethered:
             if self.tether_width is None:
-                self.tether_width = 0.1
+                self.tether_width = 0.02
             if self.tether_slack is None:
                 self.tether_slack = 0.05
         else:
             if self.projectile_size is None:
-                self.projectile_size = 0.5
+                self.projectile_size = 0.02
             if self.projectile_trail_length is None:
-                self.projectile_trail_length = 1.0
+                self.projectile_trail_length = 0.5
 
 @dataclass
 class SpiderSpreadConfig:

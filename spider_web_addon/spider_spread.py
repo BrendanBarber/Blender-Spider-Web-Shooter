@@ -212,7 +212,7 @@ class SpiderSpread:
                 obj.select_set(True)
 
     def create_mesh(self, context, origin_empty, target_empty):
-        """Updated create_mesh method that creates both spokes and ribs"""
+        """Creates both spokes and ribs for spider web mesh"""
         # Create the node tree (reuse if it exists)
         web_curve_node_tree = create_web_curve_node_tree()
         
@@ -249,7 +249,7 @@ class SpiderSpread:
             bpy.context.view_layer.objects.active = self.mesh_objs[-1]
 
     def animate_spread(self, context, origin_empty, target_empty, starting_frame=1, frame_length_seconds=1):
-        """Enhanced animation that includes expanding sphere boolean and rib movement"""
+        """Animates spread with expanding sphere boolean and rib movement"""
         
         # Calculate animation parameters
         fps = context.scene.render.fps / context.scene.render.fps_base

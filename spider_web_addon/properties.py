@@ -30,7 +30,7 @@ class SpiderShotProperties(PropertyGroup):
     tether_width: FloatProperty(
         name="Tether Width",
         description="Width of the tether strand",
-        default=SpiderShotConfig().tether_width or 0.1,
+        default=SpiderShotConfig().tether_width or 0.02,
         min=0.001,
     )
     
@@ -45,14 +45,14 @@ class SpiderShotProperties(PropertyGroup):
     projectile_size: FloatProperty(
         name="Projectile Size",
         description="Size of the projectile web ball",
-        default=SpiderShotConfig().projectile_size or 0.5,
+        default=SpiderShotConfig().projectile_size or 0.1,
         min=0.001,
     )
     
     projectile_trail_length: FloatProperty(
         name="Trail Length",
         description="Length of the projectile trail",
-        default=SpiderShotConfig().projectile_trail_length or 1.0,
+        default=SpiderShotConfig().projectile_trail_length or 0.5,
         min=0.0,
     )
 

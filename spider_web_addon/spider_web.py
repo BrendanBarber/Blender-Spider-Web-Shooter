@@ -38,8 +38,13 @@ class SpiderWeb:
         self.spider_spread.create_spread(origin_empty, target_empty)
         self.spider_spread.create_mesh(context, origin_empty, target_empty)
 
-        # Animate web
-        self.spider_spread.animate_spread(context, origin_empty, target_empty, self.config.start_frame, self.config.spider_spread_config.spread_time)
+        # Create projectile or tether
+        self.spider_shot.create_shot(context, origin_empty, target_empty, self.spider_spread.web_center)
+
+        # Animate Web
+        if self.config.animate_web:
+            self.spider_spread.animate_spread(context, origin_empty, target_empty, self.config.start_frame, self.config.spider_spread_config.spread_time)
+            # self.spider_shot.animate_shot()
         
         # Store both shot and spread configurations on the spider web empty
         self.spider_shot.store_config_on_empty(spider_web_empty)
