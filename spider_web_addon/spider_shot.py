@@ -72,121 +72,83 @@ class SpiderShot:
         else:
             self.create_shot_mesh(context, origin_empty, target_empty)
 
-    def animate_shot(self):
-        pass
-
-    def create_shot_mesh(self, context, origin_empty, target_empty):
-        """Creates the shot ball and trail for the web animation"""
-        # Create sphere mesh
-        bpy.ops.mesh.primitive_uv_sphere_add(location=(0,0,0))
-        sphere_obj = context.active_object
-        sphere_obj.name = "WebShot"
-        sphere_obj.parent = origin_empty
-        sphere_obj.parent_type = 'OBJECT'
-        
-        sphere_obj.scale = (self.config.projectile_size, self.config.projectile_size, self.config.projectile_size)
-        sphere_obj.hide_viewport = True
-        sphere_obj.hide_render = True
-        
-        self.shot_mesh = sphere_obj
-
     def create_tether_mesh(self, context, origin_empty, web_center_empty):
-        """Creates a rope-like tether connecting origin to web center"""
+        """Creates a rope tether with NURBS path hooking to connect last point to web_center"""
         
-        # Calculate the base distance between origin and web center
+        # Calculate initial distance for rope length
         origin_pos = Vector(origin_empty.location)
         web_center_pos = Vector(web_center_empty.location)
         base_distance = (web_center_pos - origin_pos).length
         
-        # Add slack to the tether length
-        tether_length = base_distance + (base_distance * self.config.tether_slack)
+        # Add slack to make the rope longer than the direct distance
+        rope_length = base_distance * (1.0 + self.config.tether_slack)
         
-        # Create a curve object for the tether
+        # Create curve for the rope
         curve_data = bpy.data.curves.new(name="WebTetherCurve", type='CURVE')
         curve_data.dimensions = '3D'
-        curve_data.resolution_u = 64  # High resolution for smooth rope
-        curve_data.bevel_depth = self.config.tether_width / 2  # Make it cylindrical
-        curve_data.bevel_resolution = 8  # Circular cross-section
+        curve_data.bevel_depth = self.config.tether_width / 2
+        curve_data.bevel_resolution = 4
         
         # Create the curve object
         tether_obj = bpy.data.objects.new("WebTether", curve_data)
         context.collection.objects.link(tether_obj)
         
-        # Create a spline (the actual curve path)
+        # Create spline with multiple points for rope sagging
         spline = curve_data.splines.new('NURBS')
+        num_points = 5  # Start, 3 middle points for sag, end
+        spline.points.add(num_points - 1)
         
-        # Calculate number of control points based on tether length for natural droop
-        num_points = max(8, int(tether_length * 10))  # More points for longer tethers
-        spline.points.add(num_points - 1)  # -1 because spline starts with 1 point
-        
-        # Set control points to create a catenary curve (rope hanging under gravity)
+        # Calculate initial rope shape with catenary sag in world coordinates
         for i in range(num_points):
-            t = i / (num_points - 1)  # Parameter from 0 to 1
+            t = i / (num_points - 1)  # 0 to 1
             
-            # Linear interpolation between start and end points
-            linear_pos = origin_pos.lerp(web_center_pos, t)
+            # Calculate positions in world space
+            world_pos = origin_pos.lerp(web_center_pos, t)
             
-            # Add catenary sag (rope hanging under its own weight)
-            # Use a simplified catenary approximation: y = a * cosh(x/a) - a
-            sag_amount = self.config.tether_slack * base_distance * 0.5
-            catenary_factor = math.cosh((t - 0.5) * 4) - 1  # Normalized catenary
-            sag_offset = catenary_factor * sag_amount
+            # Add sag - maximum at center, using catenary approximation
+            sag_factor = 4 * t * (1 - t)  # Parabolic, max at t=0.5
+            sag_amount = (rope_length - base_distance) * 0.5  # How much extra length creates sag
+            world_pos.z -= sag_factor * sag_amount  # Sag downward
             
-            # Apply sag in the direction perpendicular to the rope
-            rope_direction = (web_center_pos - origin_pos).normalized()
-            
-            # Find a perpendicular direction (preferably downward)
-            if abs(rope_direction.z) < 0.9:
-                sag_direction = Vector((0, 0, -1))  # Downward
-            else:
-                sag_direction = Vector((1, 0, 0))  # Sideways if rope is mostly vertical
-            
-            # Make sure sag direction is perpendicular to rope
-            sag_direction = sag_direction - sag_direction.dot(rope_direction) * rope_direction
-            sag_direction.normalize()
-            
-            # Apply the sag
-            final_pos = linear_pos + sag_direction * sag_offset
-            
-            # Set the point (NURBS points use homogeneous coordinates, so w=1)
-            spline.points[i].co = (final_pos.x, final_pos.y, final_pos.z, 1.0)
+            # Set world coordinates directly
+            spline.points[i].co = (world_pos.x, world_pos.y, world_pos.z, 1.0)
         
-        # Set spline properties for smooth curve
-        spline.order_u = min(4, num_points)  # Cubic or less if not enough points
+        spline.order_u = min(4, num_points)
         spline.use_endpoint_u = True
         
-        # Parent the tether to the origin empty
-        tether_obj.parent = origin_empty
-        tether_obj.parent_type = 'OBJECT'
+        # Don't parent the curve - instead use hook modifiers for both ends
         
-        # Use geometry nodes or drivers to make the tether dynamic
-        # Create a geometry nodes modifier for dynamic rope behavior
-        if hasattr(bpy.types, 'GeometryNodeTree'):
-            # Add a geometry nodes modifier for dynamic curve updates
-            geo_modifier = tether_obj.modifiers.new("TetherDynamic", 'NODES')
-            
-            # Create a simple node tree that can update curve points
-            # For now, we'll use constraints as a simpler approach
+        # Create hook modifier for the first point (origin)
+        hook_start_modifier = tether_obj.modifiers.new("StartPointHook", 'HOOK')
+        hook_start_modifier.object = origin_empty
         
-        # Alternative approach: Use constraints to make the curve dynamic
-        # Add a constraint to track the web center with the last control point
-        constraint = tether_obj.constraints.new('TRACK_TO')
-        constraint.target = web_center_empty
-        constraint.track_axis = 'TRACK_Z'
-        constraint.up_axis = 'UP_Y'
-        constraint.influence = 0.3  # Partial influence for natural rope behavior
+        # Create hook modifier for the last point (web_center)
+        hook_end_modifier = tether_obj.modifiers.new("EndPointHook", 'HOOK')
+        hook_end_modifier.object = web_center_empty
         
-        # Add damped track for more natural movement
-        damped_constraint = tether_obj.constraints.new('DAMPED_TRACK')
-        damped_constraint.target = web_center_empty
-        damped_constraint.track_axis = 'TRACK_Z'
-        damped_constraint.influence = 0.5
+        # Switch to edit mode to assign the hook points
+        context.view_layer.objects.active = tether_obj
+        bpy.ops.object.mode_set(mode='EDIT')
         
-        # Store reference to the tether mesh
+        # Deselect all points first
+        bpy.ops.curve.select_all(action='DESELECT')
+        
+        # Select and assign the first control point to start hook
+        spline = tether_obj.data.splines[0]
+        spline.points[0].select = True
+        bpy.ops.object.hook_assign(modifier="StartPointHook")
+        
+        # Deselect all, then select and assign the last control point to end hook
+        bpy.ops.curve.select_all(action='DESELECT')
+        spline.points[-1].select = True
+        bpy.ops.object.hook_assign(modifier="EndPointHook")
+        
+        # Return to object mode
+        bpy.ops.object.mode_set(mode='OBJECT')
+        
         self.tether_mesh = tether_obj
-        
         return tether_obj
-
+    
     def animate_shot(self):
         pass
 

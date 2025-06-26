@@ -76,6 +76,10 @@ class MESH_OT_update_spider_web_position(bpy.types.Operator):
             spider_web.spider_spread.create_spread(origin_empty, target_empty)
             spider_web.spider_spread.create_mesh(context, origin_empty, target_empty)
             
+            # Animate Web
+            if spider_web.config.animate_web:
+                spider_web.spider_spread.animate_spread(context, origin_empty, target_empty, spider_web.config.start_frame, spider_web.config.spider_spread_config.spread_time)
+            
             # Store the config back (including the preserved random values)
             spider_web.spider_shot.store_config_on_empty(spider_web_empty)
             spider_web.spider_spread.store_config_on_empty(spider_web_empty)

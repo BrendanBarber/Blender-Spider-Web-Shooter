@@ -1,9 +1,13 @@
 import bpy
+import bmesh
 import math
 import random
 from dataclasses import dataclass, field
 from typing import Tuple, Optional, Dict, List
 from mathutils import Vector, Matrix
+import threading
+from concurrent.futures import ThreadPoolExecutor
+import time
 from .utils import *
 from .config import *
 from .node_graphs import *
@@ -249,93 +253,216 @@ class SpiderSpread:
             bpy.context.view_layer.objects.active = self.mesh_objs[-1]
 
     def animate_spread(self, context, origin_empty, target_empty, starting_frame=1, frame_length_seconds=1):
-        """Animates spread with expanding sphere boolean and rib movement"""
+        """Animate the web spreading from the inside out"""
+        
+        # Get window manager for progress system
+        wm = context.window_manager
         
         # Calculate animation parameters
         fps = context.scene.render.fps / context.scene.render.fps_base
         frame_length_frames = int(frame_length_seconds * fps)
         end_frame = starting_frame + frame_length_frames
         
-        # 1. Animate web center moving up
-        start_position = self.target
-        end_position = get_point_offset_from_end(self.origin, self.target, self.config.height)
-
-        context.scene.frame_set(starting_frame)
-        self.web_center.location = start_position
-        self.web_center.keyframe_insert(data_path="location", frame=starting_frame)
-
-        context.scene.frame_set(end_frame)
-        self.web_center.location = end_position
-        self.web_center.keyframe_insert(data_path="location", frame=end_frame)
-
-        # 2. Create hidden expanding sphere for boolean operations
-        sphere_radius_max = self.config.radius * 1.5  # Make sure it's big enough to cover the whole web
-        
-        # Create sphere mesh
-        bpy.ops.mesh.primitive_uv_sphere_add(location=(0,0,0))
-        sphere_obj = context.active_object
-        sphere_obj.name = "WebSpreadSphere"
-        sphere_obj.parent = self.web_center
-        sphere_obj.parent_type = 'OBJECT'
-        
-        # Make sphere invisible (hide in viewport and render)
-        sphere_obj.hide_viewport = True
-        sphere_obj.hide_render = True
-        
-        # Animate sphere scale from very small to full size
-        context.scene.frame_set(starting_frame)
-        sphere_obj.scale = (0.001, 0.001, 0.001)  # Very small at start
-        sphere_obj.keyframe_insert(data_path="scale", frame=starting_frame)
-        
-        context.scene.frame_set(end_frame)
-        sphere_obj.scale = (sphere_radius_max, sphere_radius_max, sphere_radius_max)
-        sphere_obj.keyframe_insert(data_path="scale", frame=end_frame)
-        
-        # 3. Add boolean intersect modifiers to all spoke meshes
+        # Calculate total operations for progress tracking
         spoke_meshes = [obj for obj in self.mesh_objs if "WebSpoke_" in obj.name and "WebRib_" not in obj.name]
+        total_ribs = sum(len(rib_empties) for rib_empties in self.web_spokes_ribs.values())
+        total_operations = 4 + len(spoke_meshes) + (total_ribs * 2)  # Base ops + booleans + rib keyframes
         
-        for spoke_mesh in spoke_meshes:
-            # Add boolean modifier
-            bool_modifier = spoke_mesh.modifiers.new("WebSpreadBoolean", 'BOOLEAN')
-            bool_modifier.operation = 'INTERSECT'
-            bool_modifier.object = sphere_obj
-            bool_modifier.solver = 'EXACT'  # Use exact solver for better results
+        # Start progress system
+        wm.progress_begin(0, total_operations)
+        current_progress = 0
         
-        # 4. Animate ribs moving from center to their final positions
-        for spoke_empty, rib_empties in self.web_spokes_ribs.items():
-            for rib_empty in rib_empties:
-                # Store the final position
-                final_position = rib_empty.location.copy()
+        # Disable viewport updates for performance
+        original_screen_refresh = context.preferences.system.use_region_overlap
+        context.preferences.system.use_region_overlap = False
+        
+        # Store original viewport shading mode and switch to solid for performance
+        original_shading = context.space_data.shading.type if hasattr(context, 'space_data') else 'SOLID'
+        if hasattr(context, 'space_data') and hasattr(context.space_data, 'shading'):
+            context.space_data.shading.type = 'SOLID'
+        
+        try:
+            # 1. Animate web center moving up
+            wm.progress_update(current_progress)
+            print("Animating web center...")
+            
+            start_position = self.target
+            end_position = get_point_offset_from_end(self.origin, self.target, self.config.height)
+            
+            context.scene.frame_set(starting_frame)
+            self.web_center.location = start_position
+            self.web_center.keyframe_insert(data_path="location", frame=starting_frame)
+            
+            context.scene.frame_set(end_frame)
+            self.web_center.location = end_position
+            self.web_center.keyframe_insert(data_path="location", frame=end_frame)
+            
+            current_progress += 1
+            wm.progress_update(current_progress)
+            
+            # 2. Create optimized expanding sphere
+            print("Creating animation sphere...")
+            
+            sphere_radius_max = self.config.radius * 1.5
+            
+            # Create low-poly sphere for better performance
+            bpy.ops.mesh.primitive_uv_sphere_add(location=(0,0,0))
+            sphere_obj = context.active_object
+            sphere_obj.name = "WebSpreadSphere"
+            sphere_obj.parent = self.web_center
+            sphere_obj.parent_type = 'OBJECT'
+            
+            # Make sphere invisible
+            sphere_obj.hide_viewport = True
+            sphere_obj.hide_render = True
+            
+            # Animate sphere scale
+            context.scene.frame_set(starting_frame)
+            sphere_obj.scale = (0.001, 0.001, 0.001)
+            sphere_obj.keyframe_insert(data_path="scale", frame=starting_frame)
+            
+            context.scene.frame_set(end_frame)
+            sphere_obj.scale = (sphere_radius_max, sphere_radius_max, sphere_radius_max)
+            sphere_obj.keyframe_insert(data_path="scale", frame=end_frame)
+            
+            current_progress += 1
+            wm.progress_update(current_progress)
+            
+            # 3. Apply boolean modifiers in batches
+            print(f"Applying boolean modifiers to {len(spoke_meshes)} spoke meshes...")
+            
+            batch_size = 3  # Process 3 objects at a time to prevent freezing
+            
+            for i in range(0, len(spoke_meshes), batch_size):
+                batch = spoke_meshes[i:i + batch_size]
+                batch_end = min(i + batch_size, len(spoke_meshes))
                 
-                # Calculate starting position (very close to web center)
-                web_center_pos = Vector(end_position)
-                direction_to_final = (Vector(final_position) - web_center_pos).normalized()
-                start_position_rib = web_center_pos + (direction_to_final * 0.01)  # Very close to center
+                print(f"Processing boolean batch {i//batch_size + 1}/{(len(spoke_meshes) + batch_size - 1)//batch_size}")
                 
-                # Set starting keyframe
+                for j, spoke_mesh in enumerate(batch):
+                    # Add boolean modifier with FAST solver for performance
+                    bool_modifier = spoke_mesh.modifiers.new("WebSpreadBoolean", 'BOOLEAN')
+                    bool_modifier.operation = 'INTERSECT'
+                    bool_modifier.object = sphere_obj
+                    bool_modifier.solver = 'FAST'  # Faster than EXACT solver, switch back if it looks bad
+                    
+                    current_progress += 1
+                    wm.progress_update(current_progress)
+                    
+                    # Allow UI updates every few operations
+                    if (current_progress % 5) == 0:
+                        bpy.context.view_layer.update()
+                        # Force a minimal redraw without full viewport refresh
+                        for window in bpy.context.window_manager.windows:
+                            for area in window.screen.areas:
+                                if area.type == 'VIEW_3D':
+                                    area.tag_redraw()
+            
+            # Force view layer update after all booleans
+            bpy.context.view_layer.update()
+            
+            # 4. Animate ribs in optimized batches
+            print(f"Animating {total_ribs} rib objects...")
+            
+            rib_batch_size = 5  # Process 5 ribs at a time
+            all_rib_data = []
+            
+            # Collect all rib animation data first
+            for spoke_empty, rib_empties in self.web_spokes_ribs.items():
+                for rib_empty in rib_empties:
+                    final_position = rib_empty.location.copy()
+                    web_center_pos = Vector(end_position)
+                    direction_to_final = (Vector(final_position) - web_center_pos).normalized()
+                    start_position_rib = web_center_pos + (direction_to_final * 0.01)
+                    
+                    all_rib_data.append({
+                        'rib': rib_empty,
+                        'start_pos': start_position_rib,
+                        'final_pos': final_position
+                    })
+            
+            # Process ribs in batches
+            for i in range(0, len(all_rib_data), rib_batch_size):
+                batch = all_rib_data[i:i + rib_batch_size]
+                batch_num = i // rib_batch_size + 1
+                total_batches = (len(all_rib_data) + rib_batch_size - 1) // rib_batch_size
+                
+                print(f"Processing rib batch {batch_num}/{total_batches}")
+                
+                # Set starting keyframes for this batch
                 context.scene.frame_set(starting_frame)
-                rib_empty.location = start_position_rib
-                rib_empty.keyframe_insert(data_path="location", frame=starting_frame)
+                for rib_data in batch:
+                    rib_data['rib'].location = rib_data['start_pos']
+                    rib_data['rib'].keyframe_insert(data_path="location", frame=starting_frame)
+                    
+                    current_progress += 1
+                    wm.progress_update(current_progress)
                 
-                # Set ending keyframe
+                # Set ending keyframes for this batch
                 context.scene.frame_set(end_frame)
-                rib_empty.location = final_position
-                rib_empty.keyframe_insert(data_path="location", frame=end_frame)
-        
-        # 5. Optional: Add easing to keyframes for more natural animation
-        # Get all keyframes and set interpolation to ease-out
-        if context.scene.animation_data:
-            for fcurve in context.scene.animation_data.action.fcurves:
-                for keyframe in fcurve.keyframe_points:
-                    keyframe.interpolation = 'BEZIER'
-                    keyframe.handle_left_type = 'AUTO'
-                    keyframe.handle_right_type = 'AUTO'
-        
-        # Store reference to sphere for cleanup if needed
-        self.spread_sphere = sphere_obj
-        
-        # Set frame back to start
-        context.scene.frame_set(starting_frame)
+                for rib_data in batch:
+                    rib_data['rib'].location = rib_data['final_pos']
+                    rib_data['rib'].keyframe_insert(data_path="location", frame=end_frame)
+                    
+                    current_progress += 1
+                    wm.progress_update(current_progress)
+                
+                # Allow UI updates between batches
+                if batch_num % 3 == 0:  # Every 3 batches
+                    bpy.context.view_layer.update()
+                    # Tag 3D viewport areas for redraw
+                    for window in bpy.context.window_manager.windows:
+                        for area in window.screen.areas:
+                            if area.type == 'VIEW_3D':
+                                area.tag_redraw()
+            
+            # 5. Apply keyframe easing efficiently
+            print("Applying keyframe easing...")
+            
+            if context.scene.animation_data and context.scene.animation_data.action:
+                fcurves = context.scene.animation_data.action.fcurves
+                easing_batch_size = 20
+                
+                for i in range(0, len(fcurves), easing_batch_size):
+                    batch = fcurves[i:i + easing_batch_size]
+                    
+                    for fcurve in batch:
+                        for keyframe in fcurve.keyframe_points:
+                            keyframe.interpolation = 'BEZIER'
+                            keyframe.handle_left_type = 'AUTO'
+                            keyframe.handle_right_type = 'AUTO'
+                    
+                    # Periodic UI updates during easing
+                    if i % (easing_batch_size * 5) == 0:
+                        for window in bpy.context.window_manager.windows:
+                            for area in window.screen.areas:
+                                if area.type == 'VIEW_3D':
+                                    area.tag_redraw()
+            
+            current_progress += 1
+            wm.progress_update(current_progress)
+            
+            # Store reference to sphere for cleanup if needed
+            self.spread_sphere = sphere_obj
+            
+            print("Animation setup complete!")
+            
+        except Exception as e:
+            print(f"Error during animation: {e}")
+            raise
+            
+        finally:
+            # Clean up - restore viewport settings and end progress
+            context.preferences.system.use_region_overlap = original_screen_refresh
+            if hasattr(context, 'space_data') and hasattr(context.space_data, 'shading'):
+                context.space_data.shading.type = original_shading
+            wm.progress_end()
+            
+            # Set frame back to start
+            context.scene.frame_set(starting_frame)
+            
+            # Final view layer update
+            bpy.context.view_layer.update()
 
     def store_config_on_empty(self, empty):
         """Store the spread configuration as custom properties on the empty"""
