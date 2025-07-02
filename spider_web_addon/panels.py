@@ -22,7 +22,6 @@ class VIEW3D_PT_spider_web_panel(bpy.types.Panel):
         if props.animate_web:
             row = col.row()
             row.prop(props, "start_frame")
-            col.prop(props, "progressive_spread")
         
         # Coordinates Section
         box = layout.box()
