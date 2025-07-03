@@ -8,6 +8,54 @@ from .spider_web import SpiderWeb
 from .spider_spread import SpiderSpread
 from .spider_shot import SpiderShot
 
+def find_web_components(context):
+    """Find all web components, prioritizing selected objects"""
+    selected_objects = context.selected_objects
+    
+    spider_web_empty = None
+    origin_empty = None
+    target_empty = None
+    web_empties = []
+    web_curves = []
+    shot_objects = []  # For tethers, projectiles, trails
+    
+    # Look for web components in selection first
+    for obj in selected_objects:
+        if obj.type == 'EMPTY':
+            if obj.name.startswith("SpiderWeb"):
+                spider_web_empty = obj
+            elif obj.name.startswith("WebOrigin"):
+                origin_empty = obj
+            elif obj.name.startswith("WebTarget"):
+                target_empty = obj
+            elif obj.name.startswith("Web"):
+                web_empties.append(obj)
+        elif obj.type == 'MESH':
+            if obj.name.startswith("Web"):
+                web_curves.append(obj)
+            elif obj.name.startswith("SpiderTether") or obj.name.startswith("SpiderProjectile") or obj.name.startswith("SpiderProjectileTrail"):
+                shot_objects.append(obj)
+    
+    # If we don't have all components, search all objects
+    if not spider_web_empty or not origin_empty or not target_empty:
+        for obj in bpy.data.objects:
+            if obj.type == 'EMPTY':
+                if obj.name.startswith("SpiderWeb") and not spider_web_empty:
+                    spider_web_empty = obj
+                elif obj.name.startswith("WebOrigin") and not origin_empty:
+                    origin_empty = obj
+                elif obj.name.startswith("WebTarget") and not target_empty:
+                    target_empty = obj
+                elif obj.name.startswith("Web") and obj not in web_empties:
+                    web_empties.append(obj)
+            elif obj.type == 'MESH':
+                if obj.name.startswith("Web") and obj not in web_curves:
+                    web_curves.append(obj)
+                elif (obj.name.startswith("SpiderTether") or obj.name.startswith("SpiderProjectile") or obj.name.startswith("SpiderProjectileTrail")) and obj not in shot_objects:
+                    shot_objects.append(obj)
+    
+    return spider_web_empty, origin_empty, target_empty, web_empties, web_curves, shot_objects
+
 class MESH_OT_create_spider_web_from_coords(bpy.types.Operator):
     bl_idname = "mesh.create_spider_web_coords"
     bl_label = "Create Web from Coordinates"
@@ -42,7 +90,7 @@ class MESH_OT_update_spider_web_position(bpy.types.Operator):
     def execute(self, context):
         try:
             # Find spider web components
-            spider_web_empty, origin_empty, target_empty, web_empties, web_curves, shot_objects = self.find_web_components(context)
+            spider_web_empty, origin_empty, target_empty, web_empties, web_curves, shot_objects = find_web_components(context)
             
             if not spider_web_empty or not origin_empty or not target_empty:
                 self.report({'ERROR'}, "Could not find SpiderWeb, WebOrigin and WebTarget empties")
@@ -137,54 +185,6 @@ class MESH_OT_update_spider_web_position(bpy.types.Operator):
         
         return config
     
-    def find_web_components(self, context):
-        """Find all web components, prioritizing selected objects"""
-        selected_objects = context.selected_objects
-        
-        spider_web_empty = None
-        origin_empty = None
-        target_empty = None
-        web_empties = []
-        web_curves = []
-        shot_objects = []  # For tethers, projectiles, trails
-        
-        # Look for web components in selection first
-        for obj in selected_objects:
-            if obj.type == 'EMPTY':
-                if obj.name.startswith("SpiderWeb"):
-                    spider_web_empty = obj
-                elif obj.name.startswith("WebOrigin"):
-                    origin_empty = obj
-                elif obj.name.startswith("WebTarget"):
-                    target_empty = obj
-                elif obj.name.startswith("Web"):
-                    web_empties.append(obj)
-            elif obj.type == 'MESH':
-                if obj.name.startswith("Web"):
-                    web_curves.append(obj)
-                elif obj.name.startswith("SpiderTether") or obj.name.startswith("SpiderProjectile") or obj.name.startswith("SpiderProjectileTrail"):
-                    shot_objects.append(obj)
-        
-        # If we don't have all components, search all objects
-        if not spider_web_empty or not origin_empty or not target_empty:
-            for obj in bpy.data.objects:
-                if obj.type == 'EMPTY':
-                    if obj.name.startswith("SpiderWeb") and not spider_web_empty:
-                        spider_web_empty = obj
-                    elif obj.name.startswith("WebOrigin") and not origin_empty:
-                        origin_empty = obj
-                    elif obj.name.startswith("WebTarget") and not target_empty:
-                        target_empty = obj
-                    elif obj.name.startswith("Web") and obj not in web_empties:
-                        web_empties.append(obj)
-                elif obj.type == 'MESH':
-                    if obj.name.startswith("Web") and obj not in web_curves:
-                        web_curves.append(obj)
-                    elif (obj.name.startswith("SpiderTether") or obj.name.startswith("SpiderProjectile") or obj.name.startswith("SpiderProjectileTrail")) and obj not in shot_objects:
-                        shot_objects.append(obj)
-        
-        return spider_web_empty, origin_empty, target_empty, web_empties, web_curves, shot_objects
-    
     def cleanup_web_components(self, web_empties, web_curves, shot_objects):
         """Delete all web components except SpiderWeb, origin and target empties"""
         # Delete web curve objects
@@ -212,7 +212,7 @@ class MESH_OT_update_spider_web_selected(bpy.types.Operator):
     def execute(self, context):
         try:
             # Find spider web components
-            spider_web_empty, origin_empty, target_empty, web_empties, web_curves, shot_objects = self.find_web_components(context)
+            spider_web_empty, origin_empty, target_empty, web_empties, web_curves, shot_objects = find_web_components(context)
             
             if not spider_web_empty or not origin_empty or not target_empty:
                 self.report({'ERROR'}, "Could not find SpiderWeb, WebOrigin and WebTarget empties")
@@ -324,52 +324,15 @@ class MESH_OT_update_spider_web_selected(bpy.types.Operator):
         
         return config
     
-    def find_web_components(self, context):
-        """Find all web components, prioritizing selected objects"""
-        selected_objects = context.selected_objects
-        
-        spider_web_empty = None
-        origin_empty = None
-        target_empty = None
-        web_empties = []
-        web_curves = []
-        
-        # Look for web components in selection first
-        for obj in selected_objects:
-            if obj.type == 'EMPTY':
-                if obj.name.startswith("SpiderWeb"):
-                    spider_web_empty = obj
-                elif obj.name.startswith("WebOrigin"):
-                    origin_empty = obj
-                elif obj.name.startswith("WebTarget"):
-                    target_empty = obj
-                elif obj.name.startswith("Web"):
-                    web_empties.append(obj)
-            elif obj.type == 'MESH' and obj.name.startswith("Web"):
-                web_curves.append(obj)
-        
-        # If we don't have all components, search all objects
-        if not spider_web_empty or not origin_empty or not target_empty:
-            for obj in bpy.data.objects:
-                if obj.type == 'EMPTY':
-                    if obj.name.startswith("SpiderWeb") and not spider_web_empty:
-                        spider_web_empty = obj
-                    elif obj.name.startswith("WebOrigin") and not origin_empty:
-                        origin_empty = obj
-                    elif obj.name.startswith("WebTarget") and not target_empty:
-                        target_empty = obj
-                    elif obj.name.startswith("Web") and obj not in web_empties:
-                        web_empties.append(obj)
-                elif obj.type == 'MESH' and obj.name.startswith("Web") and obj not in web_curves:
-                    web_curves.append(obj)
-        
-        return spider_web_empty, origin_empty, target_empty, web_empties, web_curves
-    
-    def cleanup_web_components(self, web_empties, web_curves):
+    def cleanup_web_components(self, web_empties, web_curves, shot_objects):
         """Delete all web components except SpiderWeb, origin and target empties"""
         # Delete web curve objects
         for curve_obj in web_curves:
             bpy.data.objects.remove(curve_obj, do_unlink=True)
+        
+        # Delete shot objects (tethers, projectiles, trails)
+        for shot_obj in shot_objects:
+            bpy.data.objects.remove(shot_obj, do_unlink=True)
         
         # Delete web empties except SpiderWeb, origin and target
         empties_to_delete = [obj for obj in web_empties 
