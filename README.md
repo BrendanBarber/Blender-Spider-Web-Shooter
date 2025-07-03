@@ -14,6 +14,6 @@ A tool for Blender that provides a panel for generating stylized spider webs and
     - Web tethers
 - Easy to make edits to the web and iterate on different designs
 
-![Quick Video Showcase](https://youtu.be/EzVpIOhXq8c)
+[![Quick Video Showcase](https://img.youtube.com/vi/EzVpIOhXq8c/maxresdefault.jpg)](https://www.youtube.com/watch?v=EzVpIOhXq8c)
 
 ![Addon Panel](assets/panel.png)
